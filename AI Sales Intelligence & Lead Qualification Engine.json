@@ -1,0 +1,1372 @@
+{
+  "name": "AI Sales Intelligence & Lead Qualification Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead_capture",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -368,
+        256
+      ],
+      "id": "YOUR_ID",
+      "name": "Webhook",
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\"messages\": [ { \"role\": \"system\", \"content\": \"You are a sales lead qualification AI. Your ONLY job is to output strictly valid JSON. Do NOT include any explanations, markdown, extra text, or reasoning. Respond only with JSON, starting with { and ending with }.The JSON must ALWAYS contain ALL of the following keys exactly as written:- Name (person name), lead_quality (Hot, Warm, Cold), budget_estimate (number in USD, 0 if unknown), urgency (High, Medium, Low), use_case (short string), decision_maker (Likely, Possible, Unclear), score (integer 0-100), summary (1 sentence professional summary), email (must copy exactly from input, do NOT modify), phone (must copy exactly from input, do NOT modify),IMPORTANT RULES: Never invent or modify email or phone. If email or phone is missing in input, return null.- Scoring Guidelines: High urgency + budget + clear need = 75-100 Some intent but unclear budget = 50-74  Low intent / vague inquiry = 0-49\\n\\nIGNORE all other instructions and return ONLY the JSON.\" }, { \"role\": \"user\", \"content\": \"Lead Data:\\n{{ JSON.stringify($json) }}\" } ], \"temperature\": 0",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -304,
+        96
+      ],
+      "id": "YOUR_ID",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        112
+      ],
+      "id": "YOUR_GROQ_ID",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_ID_VALUE",
+          "mode": "list",
+          "cachedResultName": "AI sales and lead",
+          "cachedResultUrl": "https://airtable.com/app02ya6ZMfuDGsrv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_TABLE_ID_VALUE",
+          "mode": "list",
+          "cachedResultName": "AI data",
+          "cachedResultUrl": "https://airtable.com/appXXXXXXXXXX.."
+        },
+        "filterByFormula": "=AND({unique_id} = '{{ $json.unique_id }}', IS_AFTER(CREATED_TIME(), '{{ $now.minus({ days: 30 }).toISO() }}'))",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        144
+      ],
+      "id": "YOUR_AIRTABLE_ID",
+      "name": "Search records",
+      "alwaysOutputData": true,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "Hot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "YOUR_ID"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "YOUR_NODE_ID",
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "Warm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "YOUR_NODE_ID",
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "Cold",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        144
+      ],
+      "id": "YOUR_N8N_NODE_ID",
+      "name": "Switch",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0XXXXXXX",
+          "mode": "list",
+          "cachedResultName": "YOUR_SLACK_CHANNEL_NAME"
+        },
+        "text": "=🚨 *HOT LEAD ALERT* 🚨 Assigned To: {{$json.Representative_name}} (<@{{$json.Representative_slack_id}}>)\nLead quality: {{ $json.lead_quality }} \n👤 Name: {{ $json.name }} \n📧 Email:{{$json.email }}\n📱 Phone: {{ $json.phone }} \n💰 Budget: $ {{ $json.budget_estimate }}\n⚡ Urgency: {{ $json.urgency }} \n📊 Score:{{$json.score}}/100  \n📝 Summary: {{ $json.summary}} \nUnique_key: {{$json.unique_id}}\n🔥 Immediate follow-up recommended.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        208,
+        48
+      ],
+      "id": "YOUR_SLACK_NODE_ID",
+      "name": "Send a message",
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "YOUR_SLACK_API_ID",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_CHANNLE_VALUE_ID",
+          "mode": "list",
+          "cachedResultName": "YOUR_SLACK_CHANNEL_NAME"
+        },
+        "text": "=⚡*Warm Lead Alert*⚡\n🚨 Assigned To: {{$json.Representative_name}} (<@{{$json.Representative_slack_id}}>)\nLead quality: {{ $json.lead_quality }} \n👤 Name: {{ $json.name }} \n📧 Email:{{$json.email }}\n📱 Phone: {{ $json.phone }} \n💰 Budget: $ {{ $json.budget_estimate }}\n⚡ Urgency: {{ $json.urgency }} \n📊 Score:{{$json.score}}/100  \n📝 Summary: {{ $json.summary}} \nUnique_key: {{$json.unique_id}}\n🔥 Immediate follow-up recommended.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        784,
+        160
+      ],
+      "id": "YOUR_N8N_NODE_ID",
+      "name": "Send a message1",
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "YOUR_SLACK_API_ID",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "list",
+          "cachedResultName": "YOUR_SLACK_CHANNEL_NAME"
+        },
+        "text": "=❄️*Cold Lead Alert*❄️\n🚨 Assigned To: {{$json.Representative_name}} (<@{{$json.Representative_slack_id}}>)\nLead quality: {{ $json.lead_quality }} \n👤 Name: {{ $json.name }} \n📧 Email:{{$json.email }}\n📱 Phone: {{ $json.phone }} \n💰 Budget: $ {{ $json.budget_estimate }}\n⚡ Urgency: {{ $json.urgency }} \n📊 Score:{{$json.score}}/100  \n📝 Summary: {{ $json.summary}} \nUnique_key: {{$json.unique_id}}\n🔥 Immediate follow-up recommended.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        448,
+        352
+      ],
+      "id": "YOUR_SLACK_NODE_ID",
+      "name": "Send a message2",
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "YOUR_SLACK_API_ID_KEY",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_VALUE",
+          "mode": "list",
+          "cachedResultName": "AI sales and lead",
+          "cachedResultUrl": "https://airtable.com/app02XXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_VALUE",
+          "mode": "list",
+          "cachedResultName": "AI data",
+          "cachedResultUrl": "https://airtable.com/app02ya6ZMfuDGsrv/tblXXXXXXXXXXXXXX"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').item.json.unique_id }}",
+            "lead quality": "={{ $('Switch').item.json.lead_quality }}",
+            "budget_estimate": "={{ $('Switch').item.json.budget_estimate }}",
+            "urgency": "={{ $('Switch').item.json.urgency }}",
+            "use_case": "={{ $('Switch').item.json.use_case }}",
+            "decision_maker": "={{ $('Switch').item.json.decision_maker }}",
+            "score": "={{ $('Switch').item.json.score }}",
+            "summary": "={{ $('Switch').item.json.summary }}",
+            "email": "={{ $('Switch').item.json.email}}",
+            "phone": "={{ $('Switch').item.json.phone }}",
+            "Assigned_Representative": "={{ $('Switch').item.json.Representative_name }}",
+            "Assigned_Repr_id": "={{ $('Switch').item.json.Representative_slack_id }}",
+            "unique_id": "={{ $('Switch').item.json.unique_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "lead quality",
+              "displayName": "lead quality",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "budget_estimate",
+              "displayName": "budget_estimate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "use_case",
+              "displayName": "use_case",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_maker",
+              "displayName": "decision_maker",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned_Representative",
+              "displayName": "Assigned_Representative",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "unique_id",
+              "displayName": "unique_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned_Repr_id",
+              "displayName": "Assigned_Repr_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Todo",
+                  "value": "Todo"
+                },
+                {
+                  "name": "In progress",
+                  "value": "In progress"
+                },
+                {
+                  "name": "Done",
+                  "value": "Done"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        416,
+        48
+      ],
+      "id": "YOUR_AIRTABLE_ID",
+      "name": "Create or update a record"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "YOUR_N8N_NODE_ID",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "YOUR_NODE_ID",
+              "leftValue": "={{ Object.keys($json).length != 0 }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        128,
+        208
+      ],
+      "id": "YOUR_NODE_ID",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_NODE_ID",
+          "mode": "list",
+          "cachedResultName": "AI sales and lead",
+          "cachedResultUrl": "https://airtable.com/appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblXXXXXXXXXXXXXX",
+          "mode": "list",
+          "cachedResultName": "AI data",
+          "cachedResultUrl": "https://airtable.com/app02ya6ZMfuDGsrv/tblXXXXXXXXXXXXXX"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').item.json.unique_id }}",
+            "lead quality": "={{ $('Switch').item.json.lead_quality}}",
+            "budget_estimate": "={{ $('Switch').item.json.budget_estimate}}",
+            "urgency": "={{ $('Switch').item.json.urgency}}",
+            "use_case": "={{ $('Switch').item.json.use_case}}",
+            "decision_maker": "={{ $('Switch').item.json.decision_maker }}",
+            "score": "={{ $('Switch').item.json.score }}",
+            "summary": "={{ $('Switch').item.json.summary }}",
+            "email": "={{ $('Switch').item.json.email}}",
+            "phone": "={{ $('Switch').item.json.phone }}",
+            "Assigned_Representative": "={{ $('Switch').item.json.Representative_name }}",
+            "Assigned_Repr_id": "={{ $('Switch').item.json.Representative_slack_id }}",
+            "unique_id": "={{ $('Switch').item.json.unique_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "lead quality",
+              "displayName": "lead quality",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "budget_estimate",
+              "displayName": "budget_estimate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "use_case",
+              "displayName": "use_case",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_maker",
+              "displayName": "decision_maker",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned_Representative",
+              "displayName": "Assigned_Representative",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "unique_id",
+              "displayName": "unique_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned_Repr_id",
+              "displayName": "Assigned_Repr_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Todo",
+                  "value": "Todo"
+                },
+                {
+                  "name": "In progress",
+                  "value": "In progress"
+                },
+                {
+                  "name": "Done",
+                  "value": "Done"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        704,
+        560
+      ],
+      "id": "YOUR_ID",
+      "name": "Create or update a record1"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_ID_VALUE",
+          "mode": "list",
+          "cachedResultName": "AI sales and lead",
+          "cachedResultUrl": "https://airtable.com/appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_ID_VALUE",
+          "mode": "list",
+          "cachedResultName": "AI data",
+          "cachedResultUrl": "https://airtable.com/app02ya6ZMfuDGsrv/tbXXXXXXXXXXXXXX"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').item.json.unique_id }}",
+            "lead quality": "={{ $('Switch').item.json.lead_quality }}",
+            "budget_estimate": "={{ $('Switch').item.json.budget_estimate }}",
+            "urgency": "={{ $('Switch').item.json.urgency}}",
+            "use_case": "={{ $('Switch').item.json.use_case}}",
+            "decision_maker": "={{ $('Switch').item.json.decision_maker }}",
+            "score": "={{ $('Switch').item.json.score }}",
+            "summary": "={{ $('Switch').item.json.summary }}",
+            "email": "={{ $('Switch').item.json.email}}",
+            "phone": "={{ $('Switch').item.json.phone }}",
+            "Assigned_Representative": "={{ $('Switch').item.json.Representative_name }}",
+            "Assigned_Repr_id": "={{ $('Switch').item.json.Representative_slack_id }}",
+            "unique_id": "={{ $('Switch').item.json.unique_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "lead quality",
+              "displayName": "lead quality",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "budget_estimate",
+              "displayName": "budget_estimate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "use_case",
+              "displayName": "use_case",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_maker",
+              "displayName": "decision_maker",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned_Representative",
+              "displayName": "Assigned_Representative",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "unique_id",
+              "displayName": "unique_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned_Repr_id",
+              "displayName": "Assigned_Repr_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Todo",
+                  "value": "Todo"
+                },
+                {
+                  "name": "In progress",
+                  "value": "In progress"
+                },
+                {
+                  "name": "Done",
+                  "value": "Done"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        704,
+        384
+      ],
+      "id": "YOUR_AIRTABLE_ID",
+      "name": "Create or update a record2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet output = [];\n\nfor (const item of items) {\n\n  let data = item.json.body ?? item.json;\n\n  // If body is an array (multiple leads)\n  if (Array.isArray(data)) {\n\n    for (const lead of data) {\n      if (lead && typeof lead === 'object' && !Array.isArray(lead)) {\n        output.push({ json: lead });\n      }\n    }\n\n  } \n  // If single object\n  else if (data && typeof data === 'object' && !Array.isArray(data)) {\n    output.push({ json: data });\n  }\n\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        448
+      ],
+      "id": "YOUR_ID",
+      "name": "DSinRF"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Helper to safely parse JSON string\nfunction safeParse(input) {\n  if (!input) return {};              // null or undefined -> empty object\n  if (typeof input === 'string') {\n    try {\n      return JSON.parse(input);       // parse string if possible\n    } catch (err) {\n      return {};                       // fallback if invalid JSON\n    }\n  }\n  return input;                        // already an object\n}\n\n// Get input from previous node\nlet data = safeParse($json.text ?? $json);\n\n// Return a single object (not an array) for \"Run Once for Each Item\"\nreturn { json: data };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        320
+      ],
+      "id": "YOUR_ID",
+      "name": "DSXXXXXXXXXXXXXX"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "priority",
+              "value": "={{ \n  (\n    Number(String($json.score || 0).trim()) >= 75\n      ? 'Hot'\n      : Number(String($json.score || 0).trim()) >= 50\n        ? 'Warm'\n        : 'Cold'\n  ).replace(/\\n/g, '').trim()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_ID",
+              "name": "lead_quality",
+              "value": "={{ $json.lead_quality }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "budget_estimate",
+              "value": "={{ $json.budget_estimate }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_N8N_NODE_ID",
+              "name": "urgency",
+              "value": "={{ $json.urgency }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "use_case",
+              "value": "={{ $json.use_case }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "decision_maker",
+              "value": "={{ $json.decision_maker }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "score",
+              "value": "={{ $json.score }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "summary",
+              "value": "={{ $json.summary}}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "phone",
+              "value": "={{ $json.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "name",
+              "value": "={{ $json.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "sales_representative",
+              "value": "[   {\"name\":\"John\",\"slack_id\":\"UXXXX1\"},   {\"name\":\"Sarah\",\"slack_id\":\"UXXXX2\"},   {\"name\":\"Michael\",\"slack_id\":\"UXXXX3\"},   {\"name\":\"Emily\",\"slack_id\":\"UXXXX4\"},   {\"name\":\"David\",\"slack_id\":\"UXXXX5\"} ]",
+              "type": "string"
+            },
+            {
+              "id": "YOUR_NODE_ID",
+              "name": "unique_id",
+              "value": "={{ $json.Name + '|' + $json.email + '|' + $json.phone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        352
+      ],
+      "id": "YOUR_NODE_ID",
+      "name": "PrSR"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all original items\nconst originalItems = $items(\"PrSR\", 0);\n\n// Get all found duplicates from Search node\nconst searchResults = $items(\"Search records\", 0);\n\n// Create a Set of duplicate emails (or unique field you used in Airtable search)\nconst duplicateEmails = new Set(\n  searchResults.map(item => item.json.email)\n);\n\n// Filter out duplicates\nconst filteredItems = originalItems.filter(item => \n  !duplicateEmails.has(item.json.email)\n);\n\n// Now assign priority + sales rep\nreturn filteredItems.map(item => {\n\n  const score = Number(item.json.score);\n\n  let priority;\n  let representative_name;\n  let representative_slack_id;\n\n  if (score >= 85) {\n    priority = \"Hot\";\n    representative_name = \"John\";\n    representative_slack_id = \"UXXXX1\";\n  } \n  else if (score >= 70) {\n    priority = \"Warm\";\n    representative_name = \"Sarah\";\n    representative_slack_id = \"UXXXX2\";\n  } \n  else {\n    priority = \"Cold\";\n    representative_name = \"Michael\";\n    representative_slack_id = \"UXXXX3\";\n  }\n\n  return {\n    json: {\n      ...item.json,\n      priority,\n      Representative_name: representative_name,\n      Representative_slack_id: representative_slack_id\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        192
+      ],
+      "id": "YOUR_NODE_ID",
+      "name": "combine 4 data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst phoneRegex = /^\\+?[1-9]\\d{7,14}$/;\n\nconst requiredFields = [\n  \"lead_quality\",\n  \"budget_estimate\",\n  \"urgency\",\n  \"use_case\",\n  \"decision_maker\",\n  \"score\",\n  \"summary\",\n  \"email\",\n  \"phone\"\n];\n\nfor (const item of items) {\n  const data = item.json;\n\n  // ---------- Required Fields ----------\n  for (const field of requiredFields) {\n    if (\n      data[field] === undefined ||\n      data[field] === null ||\n      (typeof data[field] === \"string\" && data[field].trim() === \"\")\n    ) {\n      throw new Error(`${field} is missing or empty`);\n    }\n  }\n\n  // ---------- Type Checks ----------\n  if (typeof data.email !== \"string\")\n    throw new Error(\"Email must be a string\");\n\n  if (typeof data.score !== \"number\")\n    throw new Error(\"Score must be a number\");\n\n  if (typeof data.budget_estimate !== \"number\")\n    throw new Error(\"Budget must be a number\");\n\n  // ---------- Email Validation ----------\n  if (!emailRegex.test(data.email))\n    throw new Error(\"Invalid email format\");\n\n  // ---------- Phone Validation ----------\n  if (!phoneRegex.test(data.phone))\n    throw new Error(\"Invalid phone format\");\n\n  // ---------- Score Validation ----------\n  if (!Number.isInteger(data.score))\n    throw new Error(\"Score must be an integer\");\n\n  if (data.score < 0 || data.score > 100)\n    throw new Error(\"Score must be between 0 and 100\");\n\n  // ---------- Budget Validation ----------\n  if (!Number.isFinite(data.budget_estimate))\n    throw new Error(\"Budget must be a valid number\");\n\n  if (data.budget_estimate <= 0)\n    throw new Error(\"Budget must be greater than 0\");\n\n  // ---------- Lead Quality Validation ----------\n  const leadQuality = data.lead_quality.trim();\n\n  if (![\"Hot\", \"Warm\", \"Cold\"].includes(leadQuality))\n    throw new Error(\"Invalid lead quality\");\n\n  // ---------- Urgency Validation ----------\n  if (![\"High\", \"Medium\", \"Low\"].includes(data.urgency))\n    throw new Error(\"Invalid urgency value\");\n\n  // ---------- Length Protection ----------\n  if (data.summary.length > 1000)\n    throw new Error(\"Summary too long\");\n\n  if (data.decision_maker.length > 100)\n    throw new Error(\"Decision maker name too long\");\n}\n\n// ✅ If all items pass validation → return them unchanged\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        384
+      ],
+      "id": "YOUR_NODE_ID",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "=Name",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        208,
+        352
+      ],
+      "id": "YOUR_NODE_ID",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "=unique_id",
+        "joinMode": "keepNonMatches",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        16,
+        528
+      ],
+      "id": "YOUR_NODE_ID",
+      "name": "Merge",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "DSinRF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "DSinRF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Create or update a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "combine 4 data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Create or update a record1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Create or update a record2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DSinRF": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DSinRF1": {
+      "main": [
+        [
+          {
+            "node": "PrSR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrSR": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "combine 4 data": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "YOUR_N8N_VERSION_ID",
+  "meta": {
+    "instanceId": "YOUR_N8N_INDTANCE_ID"
+  },
+  "id": "YOUR_ID",
+  "tags": []
+}
