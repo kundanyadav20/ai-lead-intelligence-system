@@ -25,7 +25,24 @@ Webhook  
 → Slack Notifications  
 
 ---
+## Quick Start
 
+1. **Import the workflow**  
+   Download `workflows/ai-lead-intelligence-workflow.json` (or your filename)  
+   In n8n: Top-right menu → Import from File → select the JSON
+
+2. **Set up credentials**  
+   - Create Groq, Airtable, and Slack credentials in n8n  
+   - Use `config/.env.example` as a guide — copy to `.env` locally and fill your real values  
+   - Never commit real .env files!
+
+3. **Replace placeholders**  
+   In the imported workflow, update Airtable base/table IDs, Slack channel IDs, etc., with your own.
+
+4. **Activate & test**  
+   Send a sample POST request to the webhook → check Airtable for data and Slack for notifications.
+
+   
 ## Core Features
 
 ### 1. Validation-First Design
