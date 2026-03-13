@@ -28,7 +28,7 @@ Webhook  
 ## Quick Start
 
 1. **Import the workflow**  
-   Download `workflows/ai-lead-intelligence-workflow.json` (or your filename)  
+   Download `workflows/ai-lead-intelligence-workflow.json`
    In n8n: Top-right menu → Import from File → select the JSON
 
 2. **Set up credentials**  
