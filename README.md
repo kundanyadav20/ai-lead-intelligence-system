@@ -1,4 +1,4 @@
-# AI Lead Intelligence System and Lead Qualification
+# AI Sales Intelligence Lead Qualification
 
 ## Overview
 
